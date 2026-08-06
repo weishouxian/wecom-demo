@@ -33,10 +33,10 @@ public class WecomMessageService {
         if (!StringUtils.hasText(request.getTouser())
                 && !StringUtils.hasText(request.getToparty())
                 && !StringUtils.hasText(request.getTotag())) {
-            throw new IllegalArgumentException("At least one target is required: touser, toparty, or totag");
+            throw new IllegalArgumentException("至少需要指定一个接收对象：touser、toparty 或 totag");
         }
         if (!StringUtils.hasText(request.getContent())) {
-            throw new IllegalArgumentException("Message content is required");
+            throw new IllegalArgumentException("消息内容不能为空");
         }
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -56,12 +56,12 @@ public class WecomMessageService {
 
         JsonNode response = restTemplate.postForObject(uri, body, JsonNode.class);
         if (response == null) {
-            throw new IllegalStateException("Failed to send message: empty response");
+            throw new IllegalStateException("发送消息失败：响应为空");
         }
 
         int errcode = response.path("errcode").asInt(-1);
         if (errcode != 0) {
-            throw new IllegalStateException("Failed to send message: " + response);
+            throw new IllegalStateException("发送消息失败：" + response);
         }
         messageStore.addSent(request, response.path("msgid").asText(""));
         return response;

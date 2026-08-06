@@ -10,6 +10,10 @@ public class WecomProperties {
     private String appSecret;
     private String callbackToken;
     private String encodingAesKey;
+    /**
+     * 群机器人 Webhook 地址，用于将接收到的消息转发到群聊
+     */
+    private String webhookUrl;
 
     public String getCorpId() {
         return corpId;
@@ -49,5 +53,13 @@ public class WecomProperties {
 
     public void setEncodingAesKey(String encodingAesKey) {
         this.encodingAesKey = encodingAesKey;
+    }
+
+    public String getWebhookUrl() {
+        return webhookUrl;
+    }
+
+    public void setWebhookUrl(String webhookUrl) {
+        this.webhookUrl = webhookUrl;
     }
 }

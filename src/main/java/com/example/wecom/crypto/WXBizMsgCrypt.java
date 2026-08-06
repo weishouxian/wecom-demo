@@ -30,10 +30,10 @@ public class WXBizMsgCrypt {
 
     public WXBizMsgCrypt(String token, String encodingAesKey, String receiveId) {
         if (!StringUtils.hasText(token)) {
-            throw new IllegalArgumentException("wecom.callback-token is required");
+            throw new IllegalArgumentException("wecom.callback-token 未配置");
         }
         if (!StringUtils.hasText(encodingAesKey) || encodingAesKey.length() != 43) {
-            throw new IllegalArgumentException("wecom.encoding-aes-key must be 43 characters");
+            throw new IllegalArgumentException("wecom.encoding-aes-key 长度必须为 43 位");
         }
         this.token = token;
         this.receiveId = receiveId;
@@ -48,7 +48,7 @@ public class WXBizMsgCrypt {
     public String decryptMsg(String msgSignature, String timestamp, String nonce, String postData) {
         String encrypt = xmlToMap(postData).get("Encrypt");
         if (!StringUtils.hasText(encrypt)) {
-            throw new IllegalArgumentException("Missing Encrypt field in callback body");
+            throw new IllegalArgumentException("回调报文中缺少 Encrypt 字段");
         }
         verifySignature(msgSignature, timestamp, nonce, encrypt);
         return decrypt(encrypt);
@@ -57,7 +57,7 @@ public class WXBizMsgCrypt {
     private void verifySignature(String msgSignature, String timestamp, String nonce, String encrypted) {
         String signature = sha1Sorted(token, timestamp, nonce, encrypted);
         if (!signature.equals(msgSignature)) {
-            throw new IllegalArgumentException("Invalid WeCom callback signature");
+            throw new IllegalArgumentException("企业微信回调签名校验失败");
         }
     }
 
@@ -77,11 +77,11 @@ public class WXBizMsgCrypt {
                     unpadded.length - 20 - xmlLength, StandardCharsets.UTF_8);
 
             if (StringUtils.hasText(receiveId) && !receiveId.equals(decryptedReceiveId)) {
-                throw new IllegalArgumentException("Invalid receive id in encrypted message");
+                throw new IllegalArgumentException("加密消息中的 receive id 不匹配");
             }
             return message;
         } catch (Exception exception) {
-            throw new IllegalArgumentException("Failed to decrypt WeCom callback message", exception);
+            throw new IllegalArgumentException("企业微信回调消息解密失败", exception);
         }
     }
 
@@ -97,7 +97,7 @@ public class WXBizMsgCrypt {
             }
             return builder.toString();
         } catch (Exception exception) {
-            throw new IllegalStateException("Failed to calculate SHA-1 signature", exception);
+            throw new IllegalStateException("SHA-1 签名计算失败", exception);
         }
     }
 
@@ -130,7 +130,7 @@ public class WXBizMsgCrypt {
             }
             return result;
         } catch (Exception exception) {
-            throw new IllegalArgumentException("Failed to parse xml", exception);
+            throw new IllegalArgumentException("XML 解析失败", exception);
         }
     }
 }

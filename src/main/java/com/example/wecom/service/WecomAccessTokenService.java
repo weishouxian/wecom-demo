@@ -43,12 +43,12 @@ public class WecomAccessTokenService {
 
             JsonNode response = restTemplate.getForObject(uri, JsonNode.class);
             if (response == null) {
-                throw new IllegalStateException("Failed to get access_token: empty response");
+                throw new IllegalStateException("获取 access_token 失败：响应为空");
             }
 
             int errcode = response.path("errcode").asInt(-1);
             if (errcode != 0) {
-                throw new IllegalStateException("Failed to get access_token: " + response);
+                throw new IllegalStateException("获取 access_token 失败：" + response);
             }
 
             cachedToken = response.path("access_token").asText();

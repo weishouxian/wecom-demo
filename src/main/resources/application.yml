@@ -12,5 +12,7 @@ wecom:
   callback-token: ${WECOM_CALLBACK_TOKEN:}
   # 加密密钥
   encoding-aes-key: ${WECOM_ENCODING_AES_KEY:}
+  # 群机器人 Webhook 地址（接收消息后转发到群聊）
+  webhook-url: ${WECOM_WEBHOOK_URL:}
 
 

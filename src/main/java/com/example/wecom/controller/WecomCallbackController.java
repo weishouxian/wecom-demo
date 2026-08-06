@@ -3,6 +3,7 @@ package com.example.wecom.controller;
 import com.example.wecom.model.WecomCallbackMessage;
 import com.example.wecom.service.ConversationMessageStore;
 import com.example.wecom.service.WecomCallbackService;
+import com.example.wecom.service.WecomWebhookService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,10 +17,13 @@ public class WecomCallbackController {
 
     private final WecomCallbackService callbackService;
     private final ConversationMessageStore messageStore;
+    private final WecomWebhookService webhookService;
 
-    public WecomCallbackController(WecomCallbackService callbackService, ConversationMessageStore messageStore) {
+    public WecomCallbackController(WecomCallbackService callbackService, ConversationMessageStore messageStore,
+            WecomWebhookService webhookService) {
         this.callbackService = callbackService;
         this.messageStore = messageStore;
+        this.webhookService = webhookService;
     }
 
     @GetMapping
@@ -39,6 +43,7 @@ public class WecomCallbackController {
             @RequestBody String body) {
         WecomCallbackMessage message = callbackService.decryptMessage(msgSignature, timestamp, nonce, body);
         messageStore.addReceived(message);
+        webhookService.forwardAsync(message);
 
         return "success";
     }
