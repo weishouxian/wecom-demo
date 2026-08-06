@@ -71,7 +71,7 @@ public class WecomWebhookService {
             return;
         }
 
-        Map<String, Object> body = buildPayload(message);
+        Map<String, Object> body = buildPayload(message, webhookUrl);
         JsonNode response = restTemplate.postForObject(URI.create(webhookUrl), body, JsonNode.class);
         if (response == null) {
             throw new IllegalStateException("通过 Webhook 转发消息失败：响应为空");
@@ -86,7 +86,7 @@ public class WecomWebhookService {
     /**
      * 根据消息类型构造群机器人消息体，无法直接转换的类型降级为文本提示。
      */
-    private Map<String, Object> buildPayload(WecomCallbackMessage message) {
+    private Map<String, Object> buildPayload(WecomCallbackMessage message, String webhookUrl) {
         String msgType = StringUtils.hasText(message.getMsgType())
                 ? message.getMsgType().toLowerCase() : "unknown";
         String from = StringUtils.hasText(message.getFromUserName())
@@ -101,7 +101,7 @@ public class WecomWebhookService {
             case "link":
                 return linkPayload(message, from, fields);
             case "video":
-                return videoPayload(message, from, fields);
+                return videoPayload(message, from, fields, webhookUrl);
             case "voice":
             case "location":
             case "event":
@@ -174,7 +174,7 @@ public class WecomWebhookService {
      * 视频消息：通过临时素材接口下载后重新上传获取 media_id，以 file 方式发送；失败时降级为文本提示。
      */
     private Map<String, Object> videoPayload(WecomCallbackMessage message, String from,
-            Map<String, String> fields) {
+            Map<String, String> fields, String webhookUrl) {
         String mediaId = fields.get("MediaId");
         try {
             if (!StringUtils.hasText(mediaId)) {
@@ -184,7 +184,7 @@ public class WecomWebhookService {
             if (video.length > UPLOAD_VIDEO_MAX_SIZE) {
                 throw new IllegalStateException("视频大小超过素材上传 10MB 限制");
             }
-            String uploadedMediaId = uploadMedia(video, "video", mediaId + ".mp4");
+            String uploadedMediaId = uploadWebhookMedia(video, "file", mediaId + ".mp4", webhookUrl);
 
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("msgtype", "file");
@@ -219,10 +219,10 @@ public class WecomWebhookService {
     /**
      * 将文件上传为临时素材，返回新的 media_id（供群机器人 file/voice 消息使用）。
      */
-    private String uploadMedia(byte[] data, String type, String filename) {
+    private String uploadWebhookMedia(byte[] data, String type, String filename, String webhookUrl) {
         URI uri = UriComponentsBuilder
-                .fromHttpUrl("https://qyapi.weixin.qq.com/cgi-bin/media/upload")
-                .queryParam("access_token", accessTokenService.getAccessToken())
+                .fromHttpUrl("https://qyapi.weixin.qq.com/cgi-bin/webhook/upload_media")
+                .queryParam("key", extractWebhookKey(webhookUrl))
                 .queryParam("type", type)
                 .build()
                 .toUri();
@@ -248,6 +248,17 @@ public class WecomWebhookService {
             throw new IllegalStateException("上传临时素材失败：" + response);
         }
         return response.path("media_id").asText();
+    }
+
+    private String extractWebhookKey(String webhookUrl) {
+        String key = UriComponentsBuilder.fromUriString(webhookUrl)
+                .build()
+                .getQueryParams()
+                .getFirst("key");
+        if (!StringUtils.hasText(key)) {
+            throw new IllegalStateException("webhook-url 中缺少 key 参数，无法上传群机器人素材");
+        }
+        return key;
     }
 
     private static String firstNonBlank(String first, String fallback) {
