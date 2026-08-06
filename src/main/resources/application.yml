@@ -1,0 +1,16 @@
+server:
+  port: 8080
+
+wecom:
+  # 企业ID
+  corp-id: ${WECOM_CORP_ID:}
+  # 应用ID
+  agent-id: ${WECOM_AGENT_ID:0}
+  # 应用密钥
+  app-secret: ${WECOM_APP_SECRET:}
+  # 回调令牌
+  callback-token: ${WECOM_CALLBACK_TOKEN:}
+  # 加密密钥
+  encoding-aes-key: ${WECOM_ENCODING_AES_KEY:}
+
+
