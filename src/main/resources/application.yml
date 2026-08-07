@@ -1,18 +1,27 @@
 server:
   port: 8080
 
+logging:
+  file:
+    # 日志文件路径（相对于启动目录），可通过环境变量 LOG_FILE 覆盖为绝对路径
+    name: ${LOG_FILE:logs/wecom-demo.log}
+  logback:
+    rollingpolicy:
+      # 按天滚动，历史日志保留 7 天
+      max-history: 7
+
 wecom:
   # 企业ID
-  corp-id: ${WECOM_CORP_ID:}
+  corp-id: ww38362b78af5c97c5
   # 应用ID
-  agent-id: ${WECOM_AGENT_ID:0}
+  agent-id: 1000002
   # 应用密钥
-  app-secret: ${WECOM_APP_SECRET:}
+  app-secret: h1IZXzwL4COYIo3MX7-G5gVTiHyx6R5R-C2tjPALjPI
   # 回调令牌
-  callback-token: ${WECOM_CALLBACK_TOKEN:}
+  callback-token: X8JegE3fyJLMQ1yDKCx0AZg0khWA
   # 加密密钥
-  encoding-aes-key: ${WECOM_ENCODING_AES_KEY:}
+  encoding-aes-key: 418hvkHfdYC2LMqCGXmSSnz1Nr8ssWV5B5ONl0uLpF5
   # 群机器人 Webhook 地址（接收消息后转发到群聊）
-  webhook-url: ${WECOM_WEBHOOK_URL:}
+  webhook-url: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=cf42a6e2-1648-4840-87cd-dad1301e567b
 
 

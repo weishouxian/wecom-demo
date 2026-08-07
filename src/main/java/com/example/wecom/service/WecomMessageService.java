@@ -30,6 +30,14 @@ public class WecomMessageService {
     }
 
     public JsonNode sendText(SendTextRequest request) {
+        return sendMessage("text", Map.of("content", request.getContent()), request);
+    }
+
+    public JsonNode sendMarkdown(SendTextRequest request) {
+        return sendMessage("markdown", Map.of("content", request.getContent()), request);
+    }
+
+    private JsonNode sendMessage(String msgType, Map<String, Object> content, SendTextRequest request) {
         if (!StringUtils.hasText(request.getTouser())
                 && !StringUtils.hasText(request.getToparty())
                 && !StringUtils.hasText(request.getTotag())) {
@@ -43,9 +51,9 @@ public class WecomMessageService {
         putIfHasText(body, "touser", request.getTouser());
         putIfHasText(body, "toparty", request.getToparty());
         putIfHasText(body, "totag", request.getTotag());
-        body.put("msgtype", "text");
+        body.put("msgtype", msgType);
         body.put("agentid", properties.getAgentId());
-        body.put("text", Map.of("content", request.getContent()));
+        body.put(msgType, content);
         body.put("safe", 0);
 
         URI uri = UriComponentsBuilder
@@ -63,7 +71,7 @@ public class WecomMessageService {
         if (errcode != 0) {
             throw new IllegalStateException("发送消息失败：" + response);
         }
-        messageStore.addSent(request, response.path("msgid").asText(""));
+        messageStore.addSent(request, msgType, response.path("msgid").asText(""));
         return response;
     }
 

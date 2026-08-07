@@ -22,4 +22,9 @@ public class WecomMessageController {
     public JsonNode sendText(@RequestBody SendTextRequest request) {
         return messageService.sendText(request);
     }
+
+    @PostMapping("/markdown")
+    public JsonNode sendMarkdown(@RequestBody SendTextRequest request) {
+        return messageService.sendMarkdown(request);
+    }
 }

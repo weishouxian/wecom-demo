@@ -1,6 +1,7 @@
 package com.example.wecom.service;
 
 import com.example.wecom.config.WecomProperties;
+import com.example.wecom.model.WebhookMarkdownRequest;
 import com.example.wecom.model.WecomCallbackMessage;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
@@ -27,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 通过企业微信群机器人 Webhook 将接收到的消息转发到群聊。
+ * 通过企业微信群机器人将接收到的消息转发到群聊。
  * 兼容文本、图片、链接、视频等消息类型。
  */
 @Service
@@ -35,24 +36,26 @@ public class WecomWebhookService {
 
     private static final Logger log = LoggerFactory.getLogger(WecomWebhookService.class);
 
-    /** 群机器人图片消息大小上限：2MB */
+    /** 群机器人图片消息大小上限，2MB */
     private static final int WEBHOOK_IMAGE_MAX_SIZE = 2 * 1024 * 1024;
-    /** 临时素材上传视频大小上限：10MB */
+    /** 临时素材上传视频大小上限，10MB */
     private static final int UPLOAD_VIDEO_MAX_SIZE = 10 * 1024 * 1024;
 
     private final WecomProperties properties;
-    private final WecomAccessTokenService accessTokenService;
+    private final WecomMediaService mediaService;
+    private final ConversationMessageStore messageStore;
     private final RestTemplate restTemplate;
 
-    public WecomWebhookService(WecomProperties properties, WecomAccessTokenService accessTokenService,
-            RestTemplateBuilder restTemplateBuilder) {
+    public WecomWebhookService(WecomProperties properties, WecomMediaService mediaService,
+            ConversationMessageStore messageStore, RestTemplateBuilder restTemplateBuilder) {
         this.properties = properties;
-        this.accessTokenService = accessTokenService;
+        this.mediaService = mediaService;
+        this.messageStore = messageStore;
         this.restTemplate = restTemplateBuilder.build();
     }
 
     /**
-     * 异步转发消息，避免阻塞企业微信回调（需在 5 秒内返回）。
+     * 异步转发消息，避免阻塞企业微信回调（需要在 5 秒内返回）。
      */
     @Async
     public void forwardAsync(WecomCallbackMessage message) {
@@ -81,6 +84,35 @@ public class WecomWebhookService {
             throw new IllegalStateException("通过 Webhook 转发消息失败：" + response);
         }
         log.info("已将来自 {} 的 {} 消息转发到企业微信群", message.getFromUserName(), message.getMsgType());
+    }
+
+    public JsonNode sendMarkdown(WebhookMarkdownRequest request) {
+        String webhookUrl = StringUtils.hasText(request.getWebhookUrl())
+                ? request.getWebhookUrl()
+                : properties.getWebhookUrl();
+        if (!StringUtils.hasText(webhookUrl)) {
+            throw new IllegalArgumentException("未配置群机器人 webhook 地址");
+        }
+        if (!StringUtils.hasText(request.getContent())) {
+            throw new IllegalArgumentException("消息内容不能为空");
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("msgtype", "markdown");
+        body.put("markdown", Map.of("content", request.getContent()));
+
+        JsonNode response = restTemplate.postForObject(URI.create(webhookUrl), body, JsonNode.class);
+        if (response == null) {
+            throw new IllegalStateException("通过群机器人发送消息失败：响应为空");
+        }
+        int errcode = response.path("errcode").asInt(-1);
+        if (errcode != 0) {
+            throw new IllegalStateException("通过群机器人发送消息失败：" + response);
+        }
+
+        messageStore.addWebhookSent("群机器人", "markdown", request.getContent(),
+                response.path("messageid").asText(""), Map.of("WebhookUrl", webhookUrl));
+        return response;
     }
 
     /**
@@ -146,7 +178,7 @@ public class WecomWebhookService {
     }
 
     /**
-     * 链接消息：以 news 链接卡片方式发送。
+     * 链接消息：以 news 卡片方式发送。
      */
     private Map<String, Object> linkPayload(WecomCallbackMessage message, String from,
             Map<String, String> fields) {
@@ -157,8 +189,7 @@ public class WecomWebhookService {
 
         Map<String, Object> article = new LinkedHashMap<>();
         article.put("title", firstNonBlank(fields.get("Title"), "链接消息"));
-        article.put("description", firstNonBlank(fields.get("Description"),
-                String.format("转发自 %s", from)));
+        article.put("description", firstNonBlank(fields.get("Description"), String.format("转发自 %s", from)));
         article.put("url", url);
         if (StringUtils.hasText(fields.get("PicUrl"))) {
             article.put("picurl", fields.get("PicUrl"));
@@ -171,7 +202,7 @@ public class WecomWebhookService {
     }
 
     /**
-     * 视频消息：通过临时素材接口下载后重新上传获取 media_id，以 file 方式发送；失败时降级为文本提示。
+     * 视频消息：下载临时素材后重新上传获取 media_id，以 file 方式发送；失败时降级为文本提示。
      */
     private Map<String, Object> videoPayload(WecomCallbackMessage message, String from,
             Map<String, String> fields, String webhookUrl) {
@@ -180,7 +211,7 @@ public class WecomWebhookService {
             if (!StringUtils.hasText(mediaId)) {
                 throw new IllegalStateException("视频消息中缺少 MediaId 字段");
             }
-            byte[] video = download(downloadMediaUrl(mediaId));
+            byte[] video = mediaService.downloadTemporaryMedia(mediaId).getData();
             if (video.length > UPLOAD_VIDEO_MAX_SIZE) {
                 throw new IllegalStateException("视频大小超过素材上传 10MB 限制");
             }
@@ -205,15 +236,6 @@ public class WecomWebhookService {
             throw new IllegalStateException("下载文件失败，HTTP 状态码：" + response.getStatusCodeValue());
         }
         return response.getBody();
-    }
-
-    private String downloadMediaUrl(String mediaId) {
-        return UriComponentsBuilder
-                .fromHttpUrl("https://qyapi.weixin.qq.com/cgi-bin/media/get")
-                .queryParam("access_token", accessTokenService.getAccessToken())
-                .queryParam("media_id", mediaId)
-                .build()
-                .toUriString();
     }
 
     /**
